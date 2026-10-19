@@ -251,10 +251,11 @@ def recommendation_streaks(panel, t, cfg, names):
     return streak
 
 
-# Entry timing by Weeks_Recommended (backtest, 77 weeks): picks that stayed in
-# the top 20 for 1-5 weeks did ~2% better over the next 4 weeks than brand-new
-# picks; 6+ weeks showed fading 8-12 week returns (few cases, weak evidence).
-BUY_ZONE_WEEKS = (1, 5)
+# Entry timing by Weeks_Recommended (backtest, 77 weeks, both logics):
+#   1-3 weeks: ~2% better over the next 4 weeks than brand-new picks (~96% confidence)
+#   4-5 weeks: median 4w return negative, only 40-44% up, 18% lost >10%
+#   6+ weeks: too few cases, results flip between runs
+BUY_ZONE_WEEKS = (1, 3)
 
 
 def entry_note(weeks_recommended, buy_zone=BUY_ZONE_WEEKS):
