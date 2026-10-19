@@ -251,6 +251,19 @@ def recommendation_streaks(panel, t, cfg, names):
     return streak
 
 
+# Entry timing by Weeks_Recommended (backtest, 77 weeks): picks that stayed in
+# the top 20 for 1-5 weeks did ~2% better over the next 4 weeks than brand-new
+# picks; 6+ weeks showed fading 8-12 week returns (few cases, weak evidence).
+BUY_ZONE_WEEKS = (1, 5)
+
+
+def entry_note(weeks_recommended, buy_zone=BUY_ZONE_WEEKS):
+    lo, hi = buy_zone
+    if weeks_recommended < lo:
+        return "WATCH - new, wait 1 week"
+    return "BUY ZONE" if weeks_recommended <= hi else "LATE - hold, no fresh buy"
+
+
 def market_breadth(panel, t, cfg):
     px = panel.prices(cfg["ffill_limit"]).iloc[t]
     ma = panel.indicators(cfg)["ma"].iloc[t]

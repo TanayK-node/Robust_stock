@@ -153,3 +153,23 @@ def test_loader_rejects_bad_files(tmp_path):
     pd.DataFrame({"Name": ["A"], "Current Price": [1]}).to_csv(tmp_path / "latest.csv", index=False)
     with pytest.raises(ValueError, match="no 'Week"):
         load_all_weekly_data(str(tmp_path), verbose=False)
+
+
+def test_retro_run_matches_live_logic(market, tmp_path, monkeypatch):
+    import retro_run
+    folder, _, panel, _, _ = market
+    out = str(tmp_path / "retro")
+    monkeypatch.setattr(sys, "argv", ["retro_run.py", folder, "--min-mcap", "1000",
+                                      "--from-week", "65", "--out", out])
+    with contextlib.redirect_stdout(io.StringIO()):
+        retro_run.main()
+    files = sorted(os.listdir(out))
+    assert "Retro_Summary.xlsx" in files and "Results_Week70.xlsx" in files
+    cfg = {**NEW_LOGIC, "min_mcap": 1000}
+    t = panel.weeks.index(70)
+    top = pd.read_excel(os.path.join(out, "Results_Week70.xlsx"), sheet_name="Top_Picks").set_index("Name")
+    live = select(panel, t, cfg)
+    assert list(top.index) == list(live[live["Rank"] <= 20].index)
+    assert (top["Market Capitalization"] >= 1000).all()
+    streaks = recommendation_streaks(panel, t, cfg, top.index)
+    assert list(top["Weeks_Recommended"]) == list(streaks)

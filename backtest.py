@@ -70,18 +70,19 @@ def max_drawdown(curve):
     return float((curve / curve.cummax() - 1).min()) if len(curve) else np.nan
 
 
-def run_logic(panel, cfg, fwd, first_t):
+def run_logic(panel, cfg, fwd, first_t, include_last=False):
     """Replay the selection every week; return per-pick rows and per-week rows.
 
     Selection starts as early as this logic allows (so streaks are already
     counted correctly by first_t) but results are only recorded from first_t,
-    so every logic is scored on the same weeks.
+    so every logic is scored on the same weeks. include_last=True also lists
+    the latest week's picks (they have no forward returns yet).
     """
     n = cfg["top_n"]
     picks_rows, week_rows = [], []
     prev_top, streak = [], {}
     T = len(panel.weeks)
-    for t in range(first_testable_week([cfg]), T - 1):
+    for t in range(first_testable_week([cfg]), T if include_last else T - 1):
         sel = select(panel, t, cfg)
         eligible = sel[sel["Drop_Reason"] == ""]
         top = eligible.head(n)

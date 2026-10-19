@@ -4,7 +4,8 @@ import sys
 
 import pandas as pd
 
-from strategy_core import LOGICS, Panel, load_all_weekly_data, market_breadth, recommendation_streaks, select
+from strategy_core import (LOGICS, Panel, entry_note, load_all_weekly_data, market_breadth,
+                           recommendation_streaks, select)
 
 # ==========================================
 # ⚙️ CONFIGURATION
@@ -16,11 +17,6 @@ RESULTS_FOLDER = "Results"
 # Market Regime Settings (information only - does not change the picks)
 BREADTH_STRONG = 0.50
 BREADTH_WEAK = 0.30
-
-# Entry timing by Weeks_Recommended (backtest, 77 weeks): picks that stayed in
-# the top 20 for 1-5 weeks did ~2% better over the next 4 weeks than brand-new
-# picks; 6+ weeks showed fading 8-12 week returns (few cases, weak evidence).
-BUY_ZONE_WEEKS = (1, 5)
 
 # All strategy parameters (weights, filters, top N) live in strategy_core.py
 
@@ -53,9 +49,7 @@ if __name__ == "__main__":
 
     top_buys = full_report[full_report["Rank"] <= top_n].copy()
     top_buys["Weeks_Recommended"] = recommendation_streaks(panel, t, cfg, top_buys.index)
-    lo, hi = BUY_ZONE_WEEKS
-    top_buys["Entry_Note"] = top_buys["Weeks_Recommended"].map(
-        lambda k: "WATCH - new, wait 1 week" if k < lo else "BUY ZONE" if k <= hi else "LATE - hold, no fresh buy")
+    top_buys["Entry_Note"] = top_buys["Weeks_Recommended"].map(entry_note)
     full_report["Weeks_Recommended"] = top_buys["Weeks_Recommended"].reindex(full_report.index).fillna(0).astype(int)
 
     print("\n" + "=" * 80)
