@@ -35,19 +35,23 @@ CURRENT_LOGIC = {
     "top_n": 20,
 }
 
-# "new" = current logic + robustness fixes. Each fix is a single switch so the
-# backtest can measure it on its own (see ABLATIONS in backtest.py).
+# "new" = current logic + the changes that held up in the walk-forward
+# backtest on 77 weeks of real data (weeks 40-76 tested, Oct 2026):
+#   sales growth > 10%     best single change on every metric, both halves
+#   stale/illiquid guards  neutral on returns, kept so untradeable stocks
+#                          can't reach the list
+# Tested and NOT adopted (switches kept so they can be re-tested later):
+#   rank_normalize=True          much worse (Sharpe 2.33 -> 1.27)
+#   weights without 2-week term  worse short term
+#   ma_rising_weeks=4            no effect
 NEW_LOGIC = {
     **CURRENT_LOGIC,
     "name": "new",
-    "weights": {20: 0.5, 8: 0.3, 4: 0.2},  # drop the noisy 2-week term
-    "rank_normalize": True,      # weights now mean what they say
     "ffill_limit": 2,            # a price older than 2 weeks is treated as missing
     "require_fresh_price": True, # must have an actual price in the signal week
     "min_vol": 0.01,             # >= 1% weekly vol: blocks stale/illiquid charts
     "max_flat_weeks_pct": 0.20,  # <= 20% of last 20 weeks with zero price change
     "min_sales_growth": 10,      # real growth, not 0.09%
-    "ma_rising_weeks": 4,        # Stage 2: 30W MA higher than 4 weeks ago
 }
 
 LOGICS = {"current": CURRENT_LOGIC, "new": NEW_LOGIC}

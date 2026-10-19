@@ -28,16 +28,17 @@ ROUND_TRIP_COST = 0.005        # 0.5% per buy+sell (brokerage, STT, slippage)
 MIN_BUCKET_OBS = 30            # fewer observations than this = not reliable
 STREAK_BUCKETS = [(0, 0, "0"), (1, 1, "1"), (2, 2, "2"), (3, 3, "3"), (4, 5, "4-5"),
                   (6, 8, "6-8"), (9, 12, "9-12"), (13, 10**6, "13+")]
+STREAK_GROUPS = [(0, 0, "0 (new pick)"), (1, 3, "1-3"), (4, 5, "4-5"), (6, 8, "6-8"), (9, 10**6, "9+")]
 
 # Each change from NEW_LOGIC applied alone on top of CURRENT_LOGIC,
 # so you can see which change helps and which doesn't.
 ABLATIONS = {
     "current + rank-normalised score": {"rank_normalize": True},
-    "current + no 2-week lookback": {"weights": NEW_LOGIC["weights"]},
+    "current + no 2-week lookback": {"weights": {20: 0.5, 8: 0.3, 4: 0.2}},
     "current + stale/illiquid guards": {k: NEW_LOGIC[k] for k in
                                         ["ffill_limit", "require_fresh_price", "min_vol", "max_flat_weeks_pct"]},
     "current + sales growth > 10%": {"min_sales_growth": NEW_LOGIC["min_sales_growth"]},
-    "current + rising 30W MA": {"ma_rising_weeks": NEW_LOGIC["ma_rising_weeks"]},
+    "current + rising 30W MA": {"ma_rising_weeks": 4},
 }
 
 
@@ -177,10 +178,19 @@ def summarise(name, picks, weeks):
     return out
 
 
-def streak_table(picks):
+def streak_table(picks, buckets=STREAK_BUCKETS):
+    """Forward returns of picks grouped by Weeks_Recommended.
+
+    'vs other picks' compares each pick with the average of the same week's
+    top-N, which removes market ups and downs: it answers "within this week's
+    list, are the ones with streak k better or worse?".
+    """
     h = MAIN_HORIZON
+    picks = picks.copy()
+    for hz in HORIZONS:
+        picks[f"Peer_{hz}w"] = picks[f"Ret_{hz}w"] - picks.groupby("Week")[f"Ret_{hz}w"].transform("mean")
     rows = []
-    for lo, hi, label in STREAK_BUCKETS:
+    for lo, hi, label in buckets:
         b = picks[(picks["Weeks_Recommended"] >= lo) & (picks["Weeks_Recommended"] <= hi)]
         bh = b.dropna(subset=[f"Ret_{h}w"])
         row = {"Weeks_Recommended": label, "Observations": len(bh)}
@@ -190,6 +200,8 @@ def streak_table(picks):
         row[f"Up after {h}w (%)"] = (bh[f"Ret_{h}w"] > 0).mean() if len(bh) else np.nan
         row[f"Beat market {h}w (%)"] = (bh[f"Ret_{h}w"] > bh[f"Market_{h}w"]).mean() if len(bh) else np.nan
         row[f"Avg excess {h}w"] = (bh[f"Ret_{h}w"] - bh[f"Market_{h}w"]).mean() if len(bh) else np.nan
+        for hz in HORIZONS[1:]:
+            row[f"vs other picks {hz}w"] = b[f"Peer_{hz}w"].mean()
         row[f"Avg worst dip {h}w"] = bh[f"Worst_Dip_{h}w"].mean() if len(bh) else np.nan
         row[f"Lost >10% in {h}w (%)"] = (bh[f"Ret_{h}w"] < -0.10).mean() if len(bh) else np.nan
         row["Reliable"] = "yes" if len(bh) >= MIN_BUCKET_OBS else "too few - ignore"
@@ -227,6 +239,7 @@ def run(folder, output=OUTPUT_FILE):
         summary.to_excel(xw, sheet_name="Summary")
         for name, (picks, weeks) in detail.items():
             streak_table(picks).to_excel(xw, sheet_name=f"Streak_{name}", index=False)
+            streak_table(picks, STREAK_GROUPS).to_excel(xw, sheet_name=f"StreakGroups_{name}", index=False)
             weeks.to_excel(xw, sheet_name=f"Weekly_{name}", index=False)
             picks.to_excel(xw, sheet_name=f"Picks_{name}", index=False)
 
@@ -235,8 +248,9 @@ def run(folder, output=OUTPUT_FILE):
     print(summary.map(lambda v: f"{v:.4f}" if isinstance(v, float) else v).to_string())
     for name, (picks, _) in detail.items():
         print("\n" + "=" * 80 + f"\n⏳ RETURNS BY WEEKS_RECOMMENDED ({name} logic)\n" + "=" * 80)
-        st = streak_table(picks)
+        st = streak_table(picks, STREAK_GROUPS)
         cols = ["Weeks_Recommended", "Observations", f"Avg {MAIN_HORIZON}w return",
+                f"vs other picks {MAIN_HORIZON}w", "vs other picks 8w",
                 f"Up after {MAIN_HORIZON}w (%)", f"Beat market {MAIN_HORIZON}w (%)",
                 f"Avg worst dip {MAIN_HORIZON}w", f"Lost >10% in {MAIN_HORIZON}w (%)", "Reliable"]
         print(st[cols].round(3).to_string(index=False))

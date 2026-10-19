@@ -97,12 +97,10 @@ def test_new_logic_filters(market):
     ok = sel[sel["Drop_Reason"] == ""]
     assert len(ok) > 0
     assert (ok["Price"] > ok["MA_30"]).all()
-    assert (ok["MA_30"] > ok["MA_30_Prev"]).all()
     assert (ok["Price"] >= 0.85 * ok["High_40"]).all()
     assert (ok["YOY Quarterly sales growth"] > 10).all()
     assert (ok["Market Capitalization"] >= 500).all()
     assert (ok["Vol_20W"] >= 0.01).all()
-    assert ok["Composite_Score"].between(0, 100).all()
     assert list(ok["Rank"]) == list(range(1, len(ok) + 1))
     assert sel.loc[sel["Drop_Reason"] != "", "Rank"].isna().all()
     stale_names = {n for n, s in zip(names, stale) if s}
